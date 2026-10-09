@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Tetris">
+  <meta name="description" content="Tetris retro en el navegador con Top 10 global. Juega al instante, sin cuenta.">
+  <meta name="theme-color" content="#000000">
+  <title>Tetris · Top Global</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 6' shape-rendering='crispEdges'%3E%3Cg fill='%23ff0000'%3E%3Crect x='1' y='0' width='2' height='1'/%3E%3Crect x='4' y='0' width='2' height='1'/%3E%3Crect x='0' y='1' width='7' height='2'/%3E%3Crect x='1' y='3' width='5' height='1'/%3E%3Crect x='2' y='4' width='3' height='1'/%3E%3Crect x='3' y='5' width='1' height='1'/%3E%3C/g%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="supabase-config.js"></script>
+  <script defer src="tetris.js"></script>
+  <script defer src="audio.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#board">Saltar al juego</a>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand__logo" aria-hidden="true"></span>
+      <h1 class="brand__title">TETRIS</h1>
+    </div>
+
+    <div class="topbar__actions">
+      <button type="button" class="btn btn--ghost btn--sm" id="sound-btn" aria-pressed="true">
+        <span class="label-full" id="sound-label-full">Sonido: Sí</span>
+        <span class="label-short" id="sound-label-short">♪ Sí</span>
+      </button>
+
+      <div class="session" id="session">
+        <p class="session__status">
+          <span class="session__dot" id="session-dot" aria-hidden="true"></span>
+          <span id="session-name">Invitado</span>
+        </p>
+        <button type="button" class="btn btn--primary btn--sm" id="auth-btn">
+          <span class="label-full">Iniciar sesión / Registrarse</span>
+          <span class="label-short">Entrar</span>
+        </button>
+        <button type="button" class="btn btn--ghost btn--sm" id="logout-btn" hidden>
+          <span class="label-full">Cerrar sesión</span>
+          <span class="label-short">Salir</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <section class="card game" aria-label="Juego de Tetris">
+      <div class="game__main">
+
+        <div class="board-wrap">
+          <canvas id="board" width="300" height="600" role="img"
+                  aria-label="Tablero de Tetris de 10 columnas por 20 filas"></canvas>
+
+          <div class="overlay" id="overlay-start">
+            <h2 class="overlay__title">¿Listo?</h2>
+            <p class="overlay__text">Juega sin cuenta. Si quieres figurar en el Top Global, inicia sesión cuando quieras.</p>
+            <button type="button" class="btn btn--primary" id="start-btn">Jugar</button>
+            <p class="overlay__hint kbd-only">o pulsa Enter, Espacio o una flecha</p>
+            <p class="overlay__hint touch-only">Desliza para mover · Toca para rotar · Desliza rápido hacia abajo para soltar</p>
+          </div>
+
+          <div class="overlay" id="overlay-pause" hidden>
+            <h2 class="overlay__title">Pausa</h2>
+            <button type="button" class="btn btn--primary" id="resume-btn">Continuar</button>
+            <p class="overlay__hint kbd-only">o pulsa P / Enter</p>
+          </div>
+
+          <div class="overlay" id="overlay-gameover" hidden>
+            <h2 class="overlay__title">Game Over</h2>
+            <p class="overlay__score"><span id="go-score">0</span> <small>puntos</small></p>
+            <p class="overlay__text" id="go-stats">Nivel 1 · 0 líneas</p>
+
+            <p class="overlay__message" id="go-message" role="status" aria-live="polite" hidden></p>
+
+            <div class="overlay__guest" id="go-guest" hidden>
+              <p>Inicia sesión o crea una cuenta para registrar tu récord en el Top Global.</p>
+              <button type="button" class="link-btn" id="go-login-btn">Iniciar sesión / Registrarse</button>
+            </div>
+
+            <button type="button" class="btn btn--primary" id="restart-btn">Jugar de nuevo</button>
+            <p class="overlay__hint kbd-only">o pulsa Enter</p>
+          </div>
+        </div>
+
+        <aside class="side" aria-label="Información de la partida">
+          <div class="panel">
+            <h2 class="panel__title">Siguiente</h2>
+            <canvas id="next" width="120" height="120" role="img" aria-label="Siguiente pieza"></canvas>
+          </div>
+
+          <dl class="stats">
+            <div class="stat">
+              <dt>Puntaje</dt>
+              <dd id="stat-score">0</dd>
+            </div>
+            <div class="stat">
+              <dt>Nivel</dt>
+              <dd id="stat-level">1</dd>
+            </div>
+            <div class="stat">
+              <dt>Líneas</dt>
+              <dd id="stat-lines">0</dd>
+            </div>
+            <div class="stat stat--muted">
+              <dt>Mejor (este equipo)</dt>
+              <dd id="stat-best">0</dd>
+            </div>
+          </dl>
+
+          <button type="button" class="btn btn--ghost btn--block" id="pause-btn">Pausa (P)</button>
+        </aside>
+      </div>
+
+      <div class="touch-controls" aria-label="Controles táctiles">
+        <button type="button" data-action="left" aria-label="Mover a la izquierda">◀</button>
+        <button type="button" data-action="rotateCW" aria-label="Rotar">⟳</button>
+        <button type="button" data-action="right" aria-label="Mover a la derecha">▶</button>
+        <button type="button" data-action="down" aria-label="Bajar">▼</button>
+        <button type="button" data-action="hardDrop" aria-label="Caída rápida">⤓</button>
+      </div>
+    </section>
+
+    <div class="sidebar">
+      <section class="card leaderboard" aria-labelledby="lb-title">
+        <div class="card__header">
+          <h2 id="lb-title">Top 10 Global</h2>
+          <button type="button" class="icon-btn" id="lb-refresh" aria-label="Actualizar tabla" title="Actualizar">↻</button>
+        </div>
+        <table class="lb-table">
+          <thead>
+            <tr>
+              <th scope="col" class="lb-rank">Puesto</th>
+              <th scope="col">Usuario</th>
+              <th scope="col" class="lb-score">Puntuación</th>
+            </tr>
+          </thead>
+          <tbody id="lb-body"></tbody>
+        </table>
+        <p class="lb-status" id="lb-status" role="status">Cargando…</p>
+      </section>
+
+      <section class="card help" aria-labelledby="help-title">
+        <h2 id="help-title">Controles</h2>
+        <ul class="keys">
+          <li><kbd>←</kbd> <kbd>→</kbd> / <kbd>A</kbd> <kbd>D</kbd><span>Mover</span></li>
+          <li><kbd>↑</kbd> / <kbd>W</kbd> / <kbd>X</kbd><span>Rotar</span></li>
+          <li><kbd>Z</kbd> / <kbd>Q</kbd><span>Rotar inversa</span></li>
+          <li><kbd>↓</kbd> / <kbd>S</kbd><span>Bajar</span></li>
+          <li><kbd>Espacio</kbd><span>Caída rápida</span></li>
+          <li><kbd>P</kbd><span>Pausa</span></li>
+          <li><kbd>M</kbd><span>Sonido</span></li>
+        </ul>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p>Jugar es gratis y sin cuenta. Registrarte solo sirve para guardar tu récord.</p>
+  </footer>
+
+  <dialog id="auth-modal" class="modal" aria-labelledby="auth-title">
+    <div class="modal__body">
+      <div class="modal__header">
+        <h2 id="auth-title">Tu cuenta</h2>
+        <button type="button" class="icon-btn" id="auth-close" aria-label="Cerrar">✕</button>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Acceso">
+        <button type="button" role="tab" class="tab" id="tab-login" aria-selected="true">Iniciar sesión</button>
+        <button type="button" role="tab" class="tab" id="tab-register" aria-selected="false">Crear cuenta</button>
+      </div>
+
+      <form id="auth-form" novalidate>
+        <div class="field" id="field-username" hidden>
+          <label for="auth-username">Nombre de usuario</label>
+          <input type="text" id="auth-username" name="username" autocomplete="username"
+                 minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}"
+                 placeholder="3–20 caracteres: letras, números o _">
+        </div>
+
+        <div class="field">
+          <label for="auth-email">Correo electrónico</label>
+          <input type="email" id="auth-email" name="email" autocomplete="email" required placeholder="tucorreo@ejemplo.com">
+        </div>
+
+        <div class="field">
+          <label for="auth-password">Contraseña</label>
+          <input type="password" id="auth-password" name="password" autocomplete="current-password"
+                 required minlength="6" placeholder="Mínimo 6 caracteres">
+        </div>
+
+        <p class="form-message" id="auth-message" role="alert" hidden></p>
+
+        <button type="submit" class="btn btn--primary btn--block" id="auth-submit">Iniciar sesión</button>
+      </form>
+
+      <button type="button" class="link-btn modal__skip" id="auth-skip">Seguir jugando como invitado</button>
+    </div>
+  </dialog>
+</body>
+</html>
