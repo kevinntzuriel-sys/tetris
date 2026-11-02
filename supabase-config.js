@@ -1,8 +1,8 @@
 (function (global) {
   'use strict';
 
-  const SUPABASE_URL = 'https://lquomhusqzigepcyjlqy.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_yGYCgVN6HHLmwObhTnLkjw_4Gc8pm0f';
+  const SUPABASE_URL = 'https://pjvbuqmjiyisgfmjpmkz.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_CYYp9jnboK-EAnJbcny8eA_bpBJQufr';
 
   const hasCredentials =
     SUPABASE_URL.indexOf('TU-PROYECTO') === -1 &&

@@ -16,12 +16,15 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 
+  <style>@import url("https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css") layer(bootstrap);</style>
   <link rel="stylesheet" href="style.css">
 
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js"></script>
   <script defer src="supabase-config.js"></script>
   <script defer src="tetris.js"></script>
   <script defer src="audio.js"></script>
+  <script defer src="auth-form.js"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
@@ -58,7 +61,7 @@
 
   <main class="layout">
 
-    <section class="card game" aria-label="Juego de Tetris">
+    <section class="frame game" aria-label="Juego de Tetris">
       <div class="game__main">
 
         <div class="board-wrap">
@@ -135,8 +138,8 @@
     </section>
 
     <div class="sidebar">
-      <section class="card leaderboard" aria-labelledby="lb-title">
-        <div class="card__header">
+      <section class="frame leaderboard" aria-labelledby="lb-title">
+        <div class="frame__header">
           <h2 id="lb-title">Top 10 Global</h2>
           <button type="button" class="icon-btn" id="lb-refresh" aria-label="Actualizar tabla" title="Actualizar">↻</button>
         </div>
@@ -153,7 +156,7 @@
         <p class="lb-status" id="lb-status" role="status">Cargando…</p>
       </section>
 
-      <section class="card help" aria-labelledby="help-title">
+      <section class="frame help" aria-labelledby="help-title">
         <h2 id="help-title">Controles</h2>
         <ul class="keys">
           <li><kbd>←</kbd> <kbd>→</kbd> / <kbd>A</kbd> <kbd>D</kbd><span>Mover</span></li>
@@ -172,43 +175,89 @@
     <p>Jugar es gratis y sin cuenta. Registrarte solo sirve para guardar tu récord.</p>
   </footer>
 
-  <dialog id="auth-modal" class="modal" aria-labelledby="auth-title">
-    <div class="modal__body">
-      <div class="modal__header">
+  <dialog id="auth-modal" class="dialog" aria-labelledby="auth-title">
+    <div class="dialog__body">
+      <div class="dialog__header">
         <h2 id="auth-title">Tu cuenta</h2>
         <button type="button" class="icon-btn" id="auth-close" aria-label="Cerrar">✕</button>
       </div>
 
-      <div class="tabs" role="tablist" aria-label="Acceso">
-        <button type="button" role="tab" class="tab" id="tab-login" aria-selected="true">Iniciar sesión</button>
-        <button type="button" role="tab" class="tab" id="tab-register" aria-selected="false">Crear cuenta</button>
+      <div id="auth-app" class="auth-app" v-cloak>
+        <div class="tabs" role="tablist" aria-label="Acceso">
+          <button type="button" role="tab" class="tab" id="tab-login" :aria-selected="String(!isRegister)" @click="setMode('login')">Iniciar sesión</button>
+          <button type="button" role="tab" class="tab" id="tab-register" :aria-selected="String(isRegister)" @click="setMode('register')">Crear cuenta</button>
+        </div>
+
+        <form id="auth-form" novalidate @submit.prevent="submit">
+          <div class="field" v-if="isRegister">
+            <label class="form-label" for="auth-username">
+              <span>Nombre de usuario</span>
+              <span class="field__count">{{ form.username.length }}/{{ USERNAME_MAX }}</span>
+            </label>
+            <input ref="usernameInput" type="text" id="auth-username" name="username" class="form-control"
+                   :class="stateClass('username')" v-model.trim="form.username"
+                   autocomplete="username" maxlength="20" placeholder="3–20 caracteres: letras, números o _"
+                   :aria-invalid="String(showError('username'))"
+                   :aria-describedby="showError('username') ? 'auth-username-error' : null"
+                   @blur="touch('username')">
+            <div class="invalid-feedback" id="auth-username-error" v-if="showError('username')">{{ errors.username }}</div>
+          </div>
+
+          <div class="field">
+            <label class="form-label" for="auth-email">Correo electrónico</label>
+            <input ref="emailInput" type="email" id="auth-email" name="email" class="form-control"
+                   :class="stateClass('email')" v-model.trim="form.email"
+                   autocomplete="email" placeholder="tucorreo@ejemplo.com"
+                   :aria-invalid="String(showError('email'))"
+                   :aria-describedby="showError('email') ? 'auth-email-error' : null"
+                   @blur="touch('email')">
+            <div class="invalid-feedback" id="auth-email-error" v-if="showError('email')">{{ errors.email }}</div>
+          </div>
+
+          <div class="field">
+            <label class="form-label" for="auth-password">Contraseña</label>
+            <div class="input-group">
+              <input :type="showPassword ? 'text' : 'password'" id="auth-password" name="password" class="form-control"
+                     :class="stateClass('password')" v-model="form.password"
+                     :autocomplete="isRegister ? 'new-password' : 'current-password'"
+                     placeholder="Mínimo 6 caracteres"
+                     :aria-invalid="String(showError('password'))"
+                     :aria-describedby="showError('password') ? 'auth-password-error' : null"
+                     @blur="touch('password')">
+              <button type="button" class="btn btn--ghost btn--sm" @click="showPassword = !showPassword"
+                      :aria-pressed="String(showPassword)" aria-label="Mostrar u ocultar la contraseña">{{ showPassword ? 'Ocultar' : 'Ver' }}</button>
+            </div>
+            <div class="invalid-feedback" id="auth-password-error" v-if="showError('password')">{{ errors.password }}</div>
+            <div class="strength" v-if="isRegister && form.password">
+              <div class="progress" role="progressbar" aria-label="Fortaleza de la contraseña"
+                   :aria-valuenow="strength.percent" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-bar" :class="'strength--' + strength.level" :style="{ width: strength.percent + '%' }"></div>
+              </div>
+              <span class="strength__label" :class="'strength--' + strength.level">Fortaleza: {{ strength.label }}</span>
+            </div>
+          </div>
+
+          <div class="field" v-if="isRegister">
+            <label class="form-label" for="auth-confirm">Confirmar contraseña</label>
+            <input :type="showPassword ? 'text' : 'password'" id="auth-confirm" name="confirm" class="form-control"
+                   :class="stateClass('confirm')" v-model="form.confirm"
+                   autocomplete="new-password" placeholder="Repite la contraseña"
+                   :aria-invalid="String(showError('confirm'))"
+                   :aria-describedby="showError('confirm') ? 'auth-confirm-error' : null"
+                   @input="touch('confirm')" @blur="touch('confirm')">
+            <div class="invalid-feedback" id="auth-confirm-error" v-if="showError('confirm')">{{ errors.confirm }}</div>
+          </div>
+
+          <p class="form-message alert" :class="message.kind === 'error' ? 'alert-danger' : 'alert-success'"
+             id="auth-message" role="alert" :data-kind="message.kind" v-if="message.text">{{ message.text }}</p>
+
+          <p class="form-hint" v-if="!canSubmit && !submitting">Completa los campos correctamente para continuar.</p>
+
+          <button type="submit" class="btn btn--primary btn--block" id="auth-submit" :disabled="!canSubmit">{{ submitLabel }}</button>
+        </form>
       </div>
 
-      <form id="auth-form" novalidate>
-        <div class="field" id="field-username" hidden>
-          <label for="auth-username">Nombre de usuario</label>
-          <input type="text" id="auth-username" name="username" autocomplete="username"
-                 minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}"
-                 placeholder="3–20 caracteres: letras, números o _">
-        </div>
-
-        <div class="field">
-          <label for="auth-email">Correo electrónico</label>
-          <input type="email" id="auth-email" name="email" autocomplete="email" required placeholder="tucorreo@ejemplo.com">
-        </div>
-
-        <div class="field">
-          <label for="auth-password">Contraseña</label>
-          <input type="password" id="auth-password" name="password" autocomplete="current-password"
-                 required minlength="6" placeholder="Mínimo 6 caracteres">
-        </div>
-
-        <p class="form-message" id="auth-message" role="alert" hidden></p>
-
-        <button type="submit" class="btn btn--primary btn--block" id="auth-submit">Iniciar sesión</button>
-      </form>
-
-      <button type="button" class="link-btn modal__skip" id="auth-skip">Seguir jugando como invitado</button>
+      <button type="button" class="link-btn dialog__skip" id="auth-skip">Seguir jugando como invitado</button>
     </div>
   </dialog>
 </body>

@@ -4,6 +4,7 @@
   const Tetris = window.Tetris;
   const DB = window.TetrisDB;
   const Sound = window.TetrisAudio;
+  const AuthForm = window.AuthForm;
 
   const STORAGE_BEST = 'tetris.best';
   const STORAGE_MUTED = 'tetris.muted';
@@ -41,17 +42,8 @@
     lbStatus: $('lb-status'),
     lbRefresh: $('lb-refresh'),
     modal: $('auth-modal'),
-    authForm: $('auth-form'),
     authClose: $('auth-close'),
-    authSkip: $('auth-skip'),
-    tabLogin: $('tab-login'),
-    tabRegister: $('tab-register'),
-    fieldUsername: $('field-username'),
-    inputUsername: $('auth-username'),
-    inputEmail: $('auth-email'),
-    inputPassword: $('auth-password'),
-    authMessage: $('auth-message'),
-    authSubmit: $('auth-submit')
+    authSkip: $('auth-skip')
   };
 
   const engine = new Tetris.TetrisEngine();
@@ -60,7 +52,6 @@
   let currentUser = null;
   let unsavedScore = null;
   let leaderboardRows = [];
-  let authMode = 'login';
 
   const fmt = function (n) { return Number(n).toLocaleString('es'); };
 
@@ -477,29 +468,11 @@
 
   el.lbRefresh.addEventListener('click', refreshLeaderboard);
 
-  function showAuthMessage(text, kind) {
-    el.authMessage.hidden = !text;
-    el.authMessage.textContent = text || '';
-    if (kind) el.authMessage.setAttribute('data-kind', kind);
-  }
-
-  function setAuthMode(mode) {
-    authMode = mode;
-    const isRegister = mode === 'register';
-    el.tabLogin.setAttribute('aria-selected', String(!isRegister));
-    el.tabRegister.setAttribute('aria-selected', String(isRegister));
-    el.fieldUsername.hidden = !isRegister;
-    el.inputUsername.required = isRegister;
-    el.inputPassword.setAttribute('autocomplete', isRegister ? 'new-password' : 'current-password');
-    el.authSubmit.textContent = isRegister ? 'Crear cuenta' : 'Iniciar sesión';
-    showAuthMessage('');
-  }
-
   function openAuthModal(mode) {
     engine.pause();
-    setAuthMode(mode || 'login');
+    AuthForm.setMode(mode || 'login');
     if (!el.modal.open) el.modal.showModal();
-    (authMode === 'register' ? el.inputUsername : el.inputEmail).focus();
+    AuthForm.focusFirst();
   }
 
   function closeAuthModal() {
@@ -510,58 +483,14 @@
   el.goLoginBtn.addEventListener('click', function () { openAuthModal('login'); });
   el.authClose.addEventListener('click', closeAuthModal);
   el.authSkip.addEventListener('click', closeAuthModal);
-  el.tabLogin.addEventListener('click', function () { setAuthMode('login'); });
-  el.tabRegister.addEventListener('click', function () { setAuthMode('register'); });
 
   el.modal.addEventListener('click', function (e) {
     if (e.target === el.modal) closeAuthModal();
   });
 
-  el.modal.addEventListener('close', function () {
-    el.inputPassword.value = '';
-    showAuthMessage('');
-  });
+  el.modal.addEventListener('close', function () { AuthForm.reset(); });
 
-  el.authForm.addEventListener('submit', async function (e) {
-    e.preventDefault();
-    showAuthMessage('');
-
-    if (!DB.isConfigured) {
-      showAuthMessage('Las cuentas no están disponibles: falta configurar Supabase en supabase-config.js.', 'error');
-      return;
-    }
-    if (!el.authForm.checkValidity()) {
-      el.authForm.reportValidity();
-      return;
-    }
-
-    const email = el.inputEmail.value.trim();
-    const password = el.inputPassword.value;
-
-    el.authSubmit.disabled = true;
-    try {
-      if (authMode === 'register') {
-        const result = await DB.signUp({
-          email: email,
-          password: password,
-          username: el.inputUsername.value.trim()
-        });
-        if (result.needsConfirmation) {
-          setAuthMode('login');
-          showAuthMessage('Cuenta creada. Revisa tu correo para confirmarla y luego inicia sesión.', 'success');
-        } else {
-          closeAuthModal();
-        }
-      } else {
-        await DB.signIn({ email: email, password: password });
-        closeAuthModal();
-      }
-    } catch (err) {
-      showAuthMessage(err.message, 'error');
-    } finally {
-      el.authSubmit.disabled = false;
-    }
-  });
+  document.addEventListener('authform:done', closeAuthModal);
 
   Sound.setMuted(storageGet(STORAGE_MUTED) === '1');
   syncSoundButton();
